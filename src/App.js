@@ -5,21 +5,33 @@ import Webcam from "react-webcam";
 import "./App.css";
 import { nextFrame } from "@tensorflow/tfjs";
 // 2. TODO - Import drawing utility here
-import {drawRect} from "./utilities"; 
+import { drawRect } from "./utilities";
 
 function App() {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
+  var net = null;
+
+  const detectImage = async () => {
+    console.log("Detecting...");
+    await detect(net);
+    console.log("Done!")
+  }
 
   // Main function
   const runCoco = async () => {
     // 3. TODO - Load network 
-    const net = await tf.loadGraphModel('https://livelong.s3.au-syd.cloud-object-storage.appdomain.cloud/model.json')
-    
+    console.log("Loading Model...");
+    // net = await tf.loadGraphModel('https://livelong.s3.au-syd.cloud-object-storage.appdomain.cloud/model.json')
+    net = await tf.loadGraphModel('https://raw.githubusercontent.com/junyongxlee/GenerateTFRecord-FYP-Usage/d2aede4cc53d76d92d0917e177096c0f4ebd9490/model/model.json')
+    console.log("Done!");
+    // detect(net);
     // Loop and detect hands
-    setInterval(() => {
-      detect(net);
-    }, 16.7);
+    // setInterval(() => {
+    //   console.log("Detecting now");
+    //   detect(net);
+    //   // }, 16.7);
+    // }, 20000);
   };
 
   const detect = async (net) => {
@@ -29,6 +41,9 @@ function App() {
       webcamRef.current !== null &&
       webcamRef.current.video.readyState === 4
     ) {
+      // Draw mesh
+      const ctx = canvasRef.current.getContext("2d");
+
       // Get Video Properties
       const video = webcamRef.current.video;
       const videoWidth = webcamRef.current.video.videoWidth;
@@ -42,23 +57,37 @@ function App() {
       canvasRef.current.width = videoWidth;
       canvasRef.current.height = videoHeight;
 
+      ctx.drawImage(
+        video,
+        0,
+        0
+      );
+
       // 4. TODO - Make Detections
       const img = tf.browser.fromPixels(video)
-      const resized = tf.image.resizeBilinear(img, [640,480])
+      const resized = tf.image.resizeBilinear(img, [800, 600])
       const casted = resized.cast('int32')
       const expanded = casted.expandDims(0)
       const obj = await net.executeAsync(expanded)
-      
-      const boxes = await obj[4].array()
-      const classes = await obj[5].array()
-      const scores = await obj[6].array()
-    
-      // Draw mesh
-      const ctx = canvasRef.current.getContext("2d");
+      console.log({obj});
+
+      console.log({
+        '1': await obj[1].array(),
+        '2': await obj[2].array(),
+        '3': await obj[3].array(),
+        '4': await obj[4].array(),
+        '5': await obj[5].array(),
+        '6': await obj[6].array(),
+        '7': await obj[7].array(),
+      });
+
+      const boxes = await obj[2].array()
+      const classes = await obj[3].array()
+      const scores = await obj[7].array()
 
       // 5. TODO - Update drawing utility
       // drawSomething(obj, ctx)  
-      requestAnimationFrame(()=>{drawRect(boxes[0], classes[0], scores[0], 0.9, videoWidth, videoHeight, ctx)}); 
+      requestAnimationFrame(() => { drawRect(boxes[0], classes[0], scores[0], 0.5, videoWidth, videoHeight, ctx) });
 
       tf.dispose(img)
       tf.dispose(resized)
@@ -69,14 +98,18 @@ function App() {
     }
   };
 
-  useEffect(()=>{runCoco()},[]);
+  useEffect(() => { runCoco() }, []);
 
   return (
     <div className="App">
+      <button onClick={detectImage}>
+        Detect
+      </button>
       <header className="App-header">
+
         <Webcam
           ref={webcamRef}
-          muted={true} 
+          muted={true}
           style={{
             position: "absolute",
             marginLeft: "auto",
@@ -85,8 +118,8 @@ function App() {
             right: 0,
             textAlign: "center",
             zindex: 9,
-            width: 640,
-            height: 480,
+            width: 800,
+            height: 600,
           }}
         />
 
@@ -100,8 +133,8 @@ function App() {
             right: 0,
             textAlign: "center",
             zindex: 8,
-            width: 640,
-            height: 480,
+            width: 800,
+            height: 600,
           }}
         />
       </header>
